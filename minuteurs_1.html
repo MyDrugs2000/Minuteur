@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Minuteurs</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;600;700&family=Share+Tech+Mono&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#06070d;
+  --font-ui:'Rajdhani',sans-serif;
+  --font-mono:'Share Tech Mono','Courier New',monospace;
+}
+
+body{
+  background:var(--bg);
+  background-image:radial-gradient(ellipse 120% 40% at 50% 0%,#0d1a2e 0%,transparent 60%);
+  min-height:100vh;
+  font-family:var(--font-ui);
+  color:#e2e8f0;
+  padding:2rem 1rem 3rem;
+  display:flex;flex-direction:column;align-items:center;gap:2rem;
+}
+
+.app-header{text-align:center}
+.app-header h1{
+  font-size:2.4rem;font-weight:700;letter-spacing:0.25em;
+  background:linear-gradient(135deg,#7dd3fc,#3b82f6,#818cf8);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.app-header p{font-size:0.62rem;letter-spacing:0.4em;color:#334155;margin-top:0.3rem}
+
+.timers-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+  gap:1.5rem;width:100%;max-width:1080px;
+}
+
+/* ── CARD ── */
+.timer-card{
+  background:#0b0f1a;border-radius:12px;
+  border:1px solid #151d2e;
+  padding:1.5rem 1.4rem 1.2rem;
+  display:flex;flex-direction:column;gap:1rem;
+  position:relative;overflow:hidden;
+  transition:border-color 0.4s,box-shadow 0.4s;
+  box-shadow:0 4px 40px #00000066;
+}
+.timer-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  border-radius:12px 12px 0 0;
+}
+.timer-card[data-id="0"]::before{background:linear-gradient(90deg,#3b82f6,#818cf8)}
+.timer-card[data-id="1"]::before{background:linear-gradient(90deg,#10b981,#34d399)}
+.timer-card[data-id="2"]::before{background:linear-gradient(90deg,#f59e0b,#fb923c)}
+.timer-card[data-id="0"]{--c:#3b82f6;--c2:#818cf8;--cg:#3b82f622}
+.timer-card[data-id="1"]{--c:#10b981;--c2:#34d399;--cg:#10b98122}
+.timer-card[data-id="2"]{--c:#f59e0b;--c2:#fb923c;--cg:#f59e0b22}
+.timer-card.running{border-color:var(--c);box-shadow:0 0 40px var(--cg),0 4px 40px #00000066}
+.timer-card.finished{border-color:#ef4444;box-shadow:0 0 50px #ef444433;animation:cardPulse 0.6s infinite}
+@keyframes cardPulse{0%,100%{box-shadow:0 0 50px #ef444433}50%{box-shadow:0 0 80px #ef444466}}
+
+/* ── HEADER ROW ── */
+.card-header{display:flex;align-items:center;gap:0.6rem}
+.card-dot{width:8px;height:8px;border-radius:50%;background:#1e2a3a;flex-shrink:0;transition:all 0.4s}
+.running .card-dot{background:var(--c);box-shadow:0 0 8px var(--c);animation:pulse 1.5s infinite}
+.finished .card-dot{background:#ef4444;box-shadow:0 0 10px #ef4444;animation:pulse 0.4s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.card-name-input{
+  flex:1;background:transparent;border:none;outline:none;
+  font-family:var(--font-ui);font-size:1rem;font-weight:600;letter-spacing:0.08em;
+  color:#94a3b8;border-bottom:1px solid transparent;transition:color 0.2s,border-color 0.2s;padding-bottom:1px;
+}
+.card-name-input:focus{color:#e2e8f0;border-bottom-color:var(--c)}
+.card-name-input::placeholder{color:#2a3650}
+.running .card-name-input,.finished .card-name-input{color:var(--c2)}
+.card-status{font-size:0.52rem;letter-spacing:0.2em;color:#1e2a3a;white-space:nowrap;transition:color 0.3s}
+.running .card-status{color:var(--c)}
+.finished .card-status{color:#ef4444}
+
+/* ── DISPLAY ── */
+.card-display{background:#07080f;border-radius:8px;border:1px solid #0f1520;padding:1rem 0.8rem 0.6rem}
+.digits-row{display:flex;align-items:flex-end;justify-content:center;flex-wrap:wrap;gap:0;font-family:var(--font-mono)}
+.unit-wrap{display:flex;flex-direction:column;align-items:center}
+.digit-val{
+  font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:400;
+  color:#1a2540;width:clamp(40px,6vw,58px);text-align:center;
+  cursor:default;border-bottom:1px solid transparent;
+  transition:color 0.2s,border-color 0.2s;user-select:none;line-height:1.1;
+}
+.digit-val.active{color:#cbd5e1}
+.digit-val.editable{cursor:pointer;border-bottom-color:#151d2e}
+.digit-val.editable:hover{color:var(--c2);border-bottom-color:var(--c)}
+.digit-val.danger{color:#ef4444 !important;animation:blink 0.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.25}}
+.digit-input-el{
+  font-family:var(--font-mono);font-size:clamp(1.6rem,3.5vw,2.2rem);
+  width:clamp(40px,6vw,58px);text-align:center;
+  background:#0d1320;color:var(--c2);border:1px solid var(--c);border-radius:3px;outline:none;line-height:1.1;
+}
+.digit-lbl{font-size:0.45rem;letter-spacing:0.15em;color:#4a6080;margin-top:3px}
+
+.colon-sep{
+  font-family:var(--font-mono);font-size:clamp(1.2rem,2.5vw,1.7rem);
+  color:#111827;padding-bottom:1.1rem;transition:color 0.2s;
+}
+.colon-sep.active{color:#1e2a3a}
+.progress-bar{height:2px;margin-top:0.7rem;border-radius:2px;background:#0f1520;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--c),var(--c2));width:100%;transition:width 0.3s linear}
+.progress-fill.danger{background:linear-gradient(90deg,#ef4444,#fb7185)}
+
+/* ── DATE INPUT ── */
+.date-section{display:flex;flex-direction:column;gap:0.4rem}
+.date-label{font-size:0.55rem;letter-spacing:0.25em;color:#2a3650}
+.date-row{display:flex;gap:0.5rem;align-items:center}
+.date-input{
+  flex:1;background:#07080f;border:1px solid #151d2e;border-radius:5px;
+  color:#94a3b8;font-family:var(--font-mono);font-size:0.72rem;
+  padding:0.45rem 0.6rem;outline:none;transition:border-color 0.2s,color 0.2s;color-scheme:dark;
+}
+.date-input:focus{border-color:var(--c);color:#e2e8f0}
+.date-go{
+  padding:0.45rem 0.9rem;
+  background:var(--c);border:1px solid var(--c);
+  color:#fff;font-size:0.6rem;letter-spacing:0.15em;
+  font-family:var(--font-ui);font-weight:700;
+  cursor:pointer;border-radius:5px;white-space:nowrap;transition:all 0.2s;
+}
+.date-go:hover{filter:brightness(1.15)}
+.date-info{font-size:0.55rem;color:#2a3650;letter-spacing:0.05em;font-family:var(--font-mono)}
+
+.or-sep{
+  display:flex;align-items:center;gap:0.5rem;
+  font-size:0.5rem;letter-spacing:0.2em;color:#1e2a3a;
+}
+.or-sep::before,.or-sep::after{content:'';flex:1;height:1px;background:#0f1520}
+
+/* ── PRESETS ── */
+.presets{display:flex;flex-wrap:wrap;gap:0.4rem}
+.preset{
+  padding:0.28rem 0.6rem;background:transparent;border:1px solid #151d2e;
+  color:#2a3650;font-size:0.55rem;letter-spacing:0.1em;
+  font-family:var(--font-mono);cursor:pointer;border-radius:4px;transition:all 0.2s;
+}
+.preset:hover{border-color:var(--c);color:var(--c2)}
+
+/* ── CONTROLS ── */
+.card-controls{display:flex;gap:0.5rem;flex-wrap:wrap}
+.btn{
+  flex:1;min-width:70px;padding:0.55rem 0.5rem;
+  background:#07080f;border:1px solid #151d2e;
+  color:#2a3650;font-size:0.6rem;letter-spacing:0.15em;
+  font-family:var(--font-ui);font-weight:700;
+  cursor:pointer;border-radius:6px;transition:all 0.2s;
+}
+.btn:hover:not(:disabled){border-color:#334155;color:#94a3b8}
+.btn:disabled{opacity:0.2;cursor:not-allowed}
+.btn-start{border-color:var(--c);color:var(--c2);background:var(--cg)}
+.btn-start:hover:not(:disabled){background:var(--c);color:#fff !important}
+.btn-alarm{border-color:#ef4444;color:#ef4444;background:#ef444411;display:none}
+.btn-alarm:hover{background:#ef4444;color:#fff !important}
+
+/* ── FLASH ── */
+.flash-overlay{position:fixed;inset:0;background:#ef4444;opacity:0;pointer-events:none;z-index:999}
+.flash-overlay.go{animation:flashAnim 0.5s ease-out 5}
+@keyframes flashAnim{0%{opacity:0.3}100%{opacity:0}}
+
+.app-footer{font-size:0.5rem;color:#151d2e;letter-spacing:0.2em;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="flash-overlay" id="flashOverlay"></div>
+
+<div class="app-header">
+  <h1>⏱ MINUTEURS</h1>
+  <p>3 MINUTEURS SIMULTANÉS · ARRIÈRE-PLAN · SAUVEGARDE AUTO</p>
+</div>
+
+<div class="timers-grid" id="timersGrid"></div>
+<div class="app-footer">FONCTIONNE HORS-LIGNE · WEB WORKER · LOCALSTORAGE</div>
+
+<script>
+const UNITS=[
+  {key:'months',label:'MOIS',max:99},{key:'weeks',label:'SEM.',max:3},
+  {key:'days',label:'JOURS',max:6},{key:'hours',label:'H',max:23},
+  {key:'minutes',label:'MIN',max:59},{key:'seconds',label:'SEC',max:59},
+];
+const PRESETS=[
+  {label:'5 min',s:300},{label:'15 min',s:900},{label:'30 min',s:1800},
+  {label:'1 h',s:3600},{label:'8 h',s:28800},{label:'1 jour',s:86400},
+];
+const N=3;
+
+let timers=Array.from({length:N},(_,i)=>({
+  id:i,name:`Minuteur ${i+1}`,
+  remaining:0,initial:0,running:false,finished:false,
+  targetDate:null,editing:null,alarmCtx:null,saveTO:null,
+}));
+
+const WORKER_SRC=`
+  let startTime=null,remaining=0,running=false,iv=null;
+  self.onmessage=function(e){
+    const{type,payload}=e.data;
+    if(type==='START'){
+      if(!running&&remaining>0){
+        startTime=Date.now();running=true;
+        iv=setInterval(()=>{
+          const left=remaining-(Date.now()-startTime);
+          if(left<=0){clearInterval(iv);running=false;
+            self.postMessage({type:'TICK',remaining:0});
+            self.postMessage({type:'FINISHED'});}
+          else self.postMessage({type:'TICK',remaining:left});
+        },80);
+      }
+    }else if(type==='PAUSE'){
+      if(running){remaining-=Date.now()-startTime;clearInterval(iv);running=false;}
+    }else if(type==='SET'){
+      clearInterval(iv);running=false;remaining=payload;startTime=null;
+      self.postMessage({type:'TICK',remaining});
+    }
+  };
+`;
+const wBlob=URL.createObjectURL(new Blob([WORKER_SRC],{type:'application/javascript'}));
+const workers=Array.from({length:N},(_,i)=>{
+  const w=new Worker(wBlob);
+  w.onmessage=(e)=>{
+    if(e.data.type==='TICK'){timers[i].remaining=e.data.remaining;renderTimer(i);scheduleSave(i);}
+    else if(e.data.type==='FINISHED'){
+      timers[i].running=false;timers[i].finished=true;timers[i].remaining=0;
+      triggerAlarm(i);renderTimer(i);saveState();
+    }
+  };
+  return w;
+});
+function wsend(id,type,payload){workers[id].postMessage({type,payload});}
+
+function decompose(ms){
+  let t=Math.floor(ms/1000);
+  const s=t%60;t=Math.floor(t/60);
+  const m=t%60;t=Math.floor(t/60);
+  const h=t%24;t=Math.floor(t/24);
+  const d=t%7;const w=Math.floor(t/7)%4;const mo=Math.floor(t/30);
+  return{months:mo,weeks:w,days:d,hours:h,minutes:m,seconds:s};
+}
+function compose(p){
+  return((p.months*30+p.weeks*7+p.days)*24*3600+p.hours*3600+p.minutes*60+p.seconds)*1000;
+}
+function pad(n){return String(n).padStart(2,'0');}
+
+function buildAll(){
+  const grid=document.getElementById('timersGrid');grid.innerHTML='';
+  timers.forEach(t=>grid.appendChild(buildCard(t.id)));
+}
+
+function buildCard(id){
+  const card=document.createElement('div');
+  card.className='timer-card';card.id=`card${id}`;card.dataset.id=id;
+  card.innerHTML=`
+    <div class="card-header">
+      <div class="card-dot" id="dot${id}"></div>
+      <input class="card-name-input" id="name${id}" type="text"
+        placeholder="Nom du minuteur…" value="${timers[id].name}"
+        oninput="timers[${id}].name=this.value;scheduleSave(${id})"/>
+      <span class="card-status" id="status${id}">EN ATTENTE</span>
+    </div>
+    <div class="card-display">
+      <div class="digits-row" id="digits${id}"></div>
+      <div class="progress-bar"><div class="progress-fill" id="prog${id}"></div></div>
+    </div>
+    <div class="date-section" id="dateSection${id}">
+      <div class="date-label">📅 DATE & HEURE CIBLE</div>
+      <div class="date-row">
+        <input type="datetime-local" class="date-input" id="dateInput${id}"/>
+        <button class="date-go" onclick="applyDateAndStart(${id})">▶ LANCER</button>
+      </div>
+      <div class="date-info" id="dateInfo${id}"></div>
+    </div>
+    <div class="or-sep" id="orSep${id}">ou durée manuelle</div>
+    <div class="presets" id="presets${id}">
+      ${PRESETS.map(p=>`<button class="preset" onclick="applyPreset(${id},${p.s})">${p.label}</button>`).join('')}
+    </div>
+    <div class="card-controls">
+      <button class="btn btn-start" id="btnStart${id}" onclick="toggleTimer(${id})" disabled>▶ DÉMARRER</button>
+      <button class="btn" onclick="resetTimer(${id})">↺ RESET</button>
+      <button class="btn btn-alarm" id="btnAlarm${id}" onclick="stopAlarm(${id})">🔕 ALARME</button>
+    </div>
+  `;
+  return card;
+}
+
+function buildDigits(id){
+  const row=document.getElementById(`digits${id}`);row.innerHTML='';
+  UNITS.forEach((unit,i)=>{
+    const wrap=document.createElement('div');wrap.className='unit-wrap';
+    const val=document.createElement('div');
+    val.className='digit-val editable';val.id=`dv_${id}_${unit.key}`;
+    val.textContent='00';val.onclick=()=>startEdit(id,unit.key);
+    wrap.appendChild(val);
+    const lbl=document.createElement('div');lbl.className='digit-lbl';lbl.textContent=unit.label;
+    wrap.appendChild(lbl);row.appendChild(wrap);
+    if(i<UNITS.length-1){
+      const col=document.createElement('div');col.className='colon-sep';
+      col.id=`col_${id}_${i}`;col.textContent=':';row.appendChild(col);
+    }
+  });
+}
+
+function renderTimer(id){
+  const t=timers[id];const p=decompose(t.remaining);let anyActive=false;
+  UNITS.forEach((unit,i)=>{
+    const el=document.getElementById(`dv_${id}_${unit.key}`);
+    if(!el||el.tagName==='INPUT') return;
+    const v=p[unit.key];const isActive=v>0||anyActive;if(v>0) anyActive=true;
+    el.textContent=pad(v);
+    let cls='digit-val';
+    if(isActive) cls+=' active';
+    if(!t.running&&!t.finished) cls+=' editable';
+    if(t.finished) cls+=' danger';
+    el.className=cls;
+    const col=document.getElementById(`col_${id}_${i}`);
+    if(col) col.className='colon-sep'+(isActive?' active':'');
+  });
+  const pct=t.initial>0?(t.remaining/t.initial):0;
+  const prog=document.getElementById(`prog${id}`);
+  prog.style.width=(pct*100)+'%';prog.className='progress-fill'+(pct<0.15?' danger':'');
+  document.getElementById(`card${id}`).className='timer-card'+(t.running?' running':'')+(t.finished?' finished':'');
+  document.getElementById(`dot${id}`).className='card-dot'+(t.running?' running':'')+(t.finished?' finished':'');
+  const stEl=document.getElementById(`status${id}`);
+  stEl.textContent=t.finished?'⏰ ÉCOULÉ':t.running?'EN COURS':t.remaining>0?'EN PAUSE':'EN ATTENTE';
+  stEl.className='card-status'+(t.running?' running':'')+(t.finished?' finished':'');
+  const btn=document.getElementById(`btnStart${id}`);
+  btn.disabled=t.remaining<=0&&!t.finished;
+  btn.textContent=t.finished?'✓ OK':t.running?'⏸ PAUSE':t.remaining>0?'▶ REPRENDRE':'▶ DÉMARRER';
+  document.getElementById(`btnAlarm${id}`).style.display=t.finished?'block':'none';
+  const hide=t.running||t.finished;
+  document.getElementById(`dateSection${id}`).style.display=hide?'none':'flex';
+  document.getElementById(`orSep${id}`).style.display=hide?'none':'flex';
+  document.getElementById(`presets${id}`).style.display=hide?'none':'flex';
+  if(t.targetDate&&!t.running&&!t.finished) updateDateInfo(id);
+}
+
+// ── BOUTON FUSIONNÉ : calcule + lance immédiatement au même instant ──
+function applyDateAndStart(id){
+  const input=document.getElementById(`dateInput${id}`);
+  if(!input.value){
+    document.getElementById(`dateInfo${id}`).textContent='⚠ Veuillez choisir une date.';return;
+  }
+  const target=new Date(input.value);
+  // Capture de l'heure exacte au moment du clic
+  const now=new Date();
+  const diff=target-now;
+  if(diff<=0){
+    document.getElementById(`dateInfo${id}`).textContent='⚠ Cette date est déjà passée !';return;
+  }
+  const t=timers[id];
+  t.targetDate=input.value;
+  t.remaining=diff;
+  t.initial=diff;
+  t.finished=false;
+  // SET puis START en deux messages consécutifs sans aucun délai
+  wsend(id,'SET',diff);
+  wsend(id,'START');
+  t.running=true;
+  updateDateInfo(id);renderTimer(id);saveState();
+}
+
+function updateDateInfo(id){
+  const t=timers[id];if(!t.targetDate) return;
+  const target=new Date(t.targetDate);
+  const el=document.getElementById(`dateInfo${id}`);
+  if(el) el.textContent='🎯 '+target.toLocaleDateString('fr-FR',{
+    weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'
+  });
+}
+
+function applyPreset(id,seconds){
+  if(timers[id].running) return;
+  const ms=seconds*1000;
+  timers[id].remaining=ms;timers[id].initial=ms;
+  timers[id].finished=false;timers[id].targetDate=null;
+  document.getElementById(`dateInfo${id}`).textContent='';
+  wsend(id,'SET',ms);renderTimer(id);saveState();
+}
+
+function toggleTimer(id){
+  const t=timers[id];
+  if(t.finished){stopAlarm(id);return;}
+  if(t.running){wsend(id,'PAUSE');t.running=false;}
+  else{if(t.remaining<=0)return;wsend(id,'START');t.running=true;}
+  renderTimer(id);saveState();
+}
+
+function resetTimer(id){
+  const t=timers[id];
+  if(t.targetDate){
+    // Recalcul depuis la date cible : toujours exact
+    const left=new Date(t.targetDate)-new Date();
+    t.remaining=Math.max(0,left);
+    t.initial=t.remaining;
+  }else{
+    t.remaining=t.initial;
+  }
+  wsend(id,'SET',t.remaining);
+  t.running=false;t.finished=false;
+  stopAlarm(id,true);renderTimer(id);saveState();
+}
+
+function triggerAlarm(id){
+  const ov=document.getElementById('flashOverlay');
+  ov.className='';void ov.offsetWidth;ov.className='flash-overlay go';
+  if(navigator.vibrate) navigator.vibrate([500,200,500,200,1000,300,500,200,500]);
+  playAlarm(id);
+  document.title=`⏰ ${timers[id].name} — TEMPS ÉCOULÉ !`;
+}
+function playAlarm(id){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    timers[id].alarmCtx=ctx;
+    const melody=[523,659,784,880,784,659,523,880];
+    let t=ctx.currentTime;
+    melody.forEach(freq=>{
+      const o=ctx.createOscillator();const g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.type='triangle';o.frequency.value=freq;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.35,t+0.03);
+      g.gain.linearRampToValueAtTime(0,t+0.22);o.start(t);o.stop(t+0.25);t+=0.23;
+    });
+    setTimeout(()=>{if(timers[id].finished)playAlarm(id);},2500);
+  }catch(e){}
+}
+function stopAlarm(id,silent=false){
+  timers[id].finished=false;
+  const ctx=timers[id].alarmCtx;
+  if(ctx){try{ctx.close();}catch(e){}timers[id].alarmCtx=null;}
+  if(!silent) document.title='Minuteurs';
+  renderTimer(id);
+}
+
+function startEdit(id,key){
+  const t=timers[id];if(t.running||t.finished) return;
+  if(t.editing!==null) commitEdit(id);
+  t.editing=key;
+  const el=document.getElementById(`dv_${id}_${key}`);
+  const p=decompose(t.remaining);
+  const inp=document.createElement('input');
+  inp.type='number';inp.className='digit-input-el';
+  inp.value=p[key];inp.min=0;inp.max=UNITS.find(u=>u.key===key).max;
+  el.replaceWith(inp);inp.id=`dv_${id}_${key}`;inp.focus();inp.select();
+  inp.onblur=()=>commitEdit(id);
+  inp.onkeydown=(e)=>{if(e.key==='Enter')commitEdit(id);if(e.key==='Escape'){t.editing=null;renderTimer(id);}};
+}
+function commitEdit(id){
+  const t=timers[id];if(t.editing===null) return;
+  const key=t.editing;
+  const inp=document.getElementById(`dv_${id}_${key}`);
+  if(!inp||inp.tagName!=='INPUT'){t.editing=null;return;}
+  const v=parseInt(inp.value,10);
+  const unit=UNITS.find(u=>u.key===key);
+  const p=decompose(t.remaining);
+  if(!isNaN(v)&&v>=0&&v<=unit.max) p[key]=v;
+  const ms=compose(p);
+  t.remaining=ms;t.initial=ms;t.targetDate=null;
+  wsend(id,'SET',ms);
+  const div=document.createElement('div');
+  div.className='digit-val editable';div.id=`dv_${id}_${key}`;
+  div.onclick=()=>startEdit(id,key);inp.replaceWith(div);t.editing=null;
+  document.getElementById(`dateInfo${id}`).textContent='';
+  renderTimer(id);saveState();
+}
+
+function saveState(){
+  try{
+    const data=timers.map(t=>({
+      name:t.name,remaining:t.remaining,initial:t.initial,
+      running:t.running,finished:t.finished,
+      targetDate:t.targetDate,savedAt:Date.now()
+    }));
+    localStorage.setItem('minuteurs_v3',JSON.stringify(data));
+  }catch(e){}
+}
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem('minuteurs_v3');if(!raw) return;
+    const data=JSON.parse(raw);
+    data.forEach((s,i)=>{
+      if(i>=N) return;
+      timers[i].name=s.name||`Minuteur ${i+1}`;
+      timers[i].initial=s.initial||0;
+      timers[i].targetDate=s.targetDate||null;
+      timers[i].finished=s.finished||false;
+      if(s.running&&!s.finished){
+        if(s.targetDate){
+          // Source de vérité = date cible : calcul toujours exact
+          const left=new Date(s.targetDate)-new Date();
+          if(left<=0){timers[i].remaining=0;timers[i].finished=true;}
+          else{timers[i].remaining=left;timers[i]._wasRunning=true;}
+        }else if(s.savedAt){
+          const left=(s.remaining||0)-(Date.now()-s.savedAt);
+          if(left<=0){timers[i].remaining=0;timers[i].finished=true;}
+          else{timers[i].remaining=left;timers[i]._wasRunning=true;}
+        }
+      }else{
+        timers[i].remaining=s.remaining||0;
+      }
+    });
+  }catch(e){}
+}
+
+function scheduleSave(id){clearTimeout(timers[id].saveTO);timers[id].saveTO=setTimeout(saveState,2000);}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveState();});
+window.addEventListener('beforeunload',()=>saveState());
+
+// ── INIT ──
+loadState();buildAll();
+timers.forEach(t=>{
+  buildDigits(t.id);
+  wsend(t.id,'SET',t.remaining);
+  const ni=document.getElementById(`name${t.id}`);if(ni) ni.value=t.name;
+  if(t.targetDate){const di=document.getElementById(`dateInput${t.id}`);if(di) di.value=t.targetDate;}
+  renderTimer(t.id);
+  if(t._wasRunning&&t.remaining>0){
+    const p=decompose(t.remaining);
+    const str=[p.hours?p.hours+'h':'',p.minutes?p.minutes+'min':'',p.seconds?p.seconds+'s':''].filter(Boolean).join(' ')||'0s';
+    if(confirm(`"${t.name}" était en cours — il reste ${str}. Reprendre ?`)){
+      wsend(t.id,'START');t.running=true;renderTimer(t.id);
+    }
+  }else if(t.finished){triggerAlarm(t.id);renderTimer(t.id);}
+});
+</script>
+</body>
+</html>
